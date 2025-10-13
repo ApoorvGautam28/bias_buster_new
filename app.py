@@ -8,8 +8,13 @@ from bias.metrics import compute_bias_report
 from bias.mitigate import reweigh_dataset, resample_dataset
 
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_DIR = os.path.join(APP_ROOT, 'uploads')
-OUTPUT_DIR = os.path.join(APP_ROOT, 'outputs')
+# Use writable /tmp on Vercel; otherwise default to project directory
+if os.environ.get('VERCEL'):
+    BASE_DIR = "/tmp/bias-buster"
+else:
+    BASE_DIR = APP_ROOT
+UPLOAD_DIR = os.path.join(BASE_DIR, 'uploads')
+OUTPUT_DIR = os.path.join(BASE_DIR, 'outputs')
 ALLOWED_EXTENSIONS = {'.csv'}
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)

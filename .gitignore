@@ -14,3 +14,5 @@ ENV/
 /data/
 /uploads/
 /outputs/
+
+.vercel
