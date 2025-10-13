@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bias Buster</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .glass { backdrop-filter: blur(10px); background: rgba(255,255,255,0.08); }
+    .gradient-bg { background: radial-gradient(1200px 600px at 10% -10%, #7c3aed33, transparent),
+                                  radial-gradient(1000px 500px at 110% 10%, #06b6d433, transparent),
+                                  linear-gradient(135deg, #0b1220 0%, #0b1220 100%); }
+  </style>
+</head>
+<body class="gradient-bg min-h-screen text-slate-100">
+  <header class="max-w-6xl mx-auto px-6 pt-10">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-fuchsia-500 to-cyan-400 shadow-lg"></div>
+        <h1 class="text-2xl font-extrabold tracking-tight">Bias Buster</h1>
+      </div>
+      <a href="https://flask.palletsprojects.com/" target="_blank" class="text-sm text-slate-300 hover:text-white">Flask</a>
+    </div>
+    <p class="mt-4 text-slate-300 max-w-3xl">Upload a dataset, select the sensitive attribute and (optionally) a target outcome. Analyze fairness metrics and export a mitigated dataset via reweighing or resampling.</p>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 py-10">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <section class="lg:col-span-2 glass rounded-2xl border border-white/10 p-6">
+        <h2 class="text-lg font-semibold mb-4">1) Upload Dataset</h2>
+        <form id="uploadForm" class="space-y-4">
+          <div class="flex items-center gap-4">
+            <input id="fileInput" type="file" accept=".csv" class="file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-fuchsia-500 file:text-white hover:file:bg-fuchsia-600 cursor-pointer" />
+            <button id="uploadBtn" type="submit" class="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-600 font-semibold">Upload</button>
+          </div>
+          <p id="fileMeta" class="text-sm text-slate-300"></p>
+        </form>
+
+        <div id="configPanel" class="mt-8 hidden">
+          <h2 class="text-lg font-semibold mb-4">2) Configure Columns</h2>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-sm mb-2">Sensitive Attribute</label>
+              <select id="sensitiveSelect" class="w-full bg-white/5 border border-white/10 rounded-lg p-2"></select>
+            </div>
+            <div>
+              <label class="block text-sm mb-2">Target (optional)</label>
+              <select id="targetSelect" class="w-full bg-white/5 border border-white/10 rounded-lg p-2"></select>
+            </div>
+            <div>
+              <label class="block text-sm mb-2">Positive Label (optional)</label>
+              <input id="positiveLabel" placeholder="e.g., 1 or hired" class="w-full bg-white/5 border border-white/10 rounded-lg p-2" />
+            </div>
+          </div>
+
+          <div class="mt-6 flex flex-wrap items-center gap-3">
+            <button id="analyzeBtn" class="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 font-semibold">Analyze Bias</button>
+            <div class="flex items-center gap-2">
+              <label class="text-sm text-slate-300">Mitigation</label>
+              <select id="methodSelect" class="bg-white/5 border border-white/10 rounded-lg p-2">
+                <option value="reweigh">Reweigh</option>
+                <option value="resample">Resample</option>
+              </select>
+            </div>
+            <button id="mitigateBtn" class="px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 font-semibold">Mitigate & Export</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="glass rounded-2xl border border-white/10 p-6">
+        <h2 class="text-lg font-semibold">Results</h2>
+        <div id="results" class="mt-4 space-y-4">
+          <p class="text-slate-300 text-sm">Upload and analyze to see metrics.</p>
+        </div>
+        <div id="downloadPanel" class="mt-6 hidden">
+          <a id="downloadLink" class="px-4 py-2 rounded-lg bg-gradient-to-r from-fuchsia-500 to-cyan-500 font-semibold" download>Download Mitigated CSV</a>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <footer class="max-w-6xl mx-auto px-6 pb-10 text-slate-400 text-sm">
+    Built for local use. No data leaves your machine.
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
