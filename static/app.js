@@ -1,5 +1,22 @@
-let state = { file_id: null, columns: [] };
+// Initialize AOS (Animate On Scroll)
+if (typeof AOS !== 'undefined') {
+  AOS.init({
+    duration: 800,
+    easing: 'ease-out-cubic',
+    once: true,
+    offset: 50
+  });
+}
 
+// State management
+let state = { 
+  file_id: null, 
+  columns: [],
+  isAnalyzing: false,
+  analysisComplete: false
+};
+
+// DOM Elements
 const uploadForm = document.getElementById('uploadForm');
 const fileInput = document.getElementById('fileInput');
 const fileMeta = document.getElementById('fileMeta');
@@ -9,25 +26,189 @@ const targetSelect = document.getElementById('targetSelect');
 const positiveLabelInput = document.getElementById('positiveLabel');
 const analyzeBtn = document.getElementById('analyzeBtn');
 const methodSelect = document.getElementById('methodSelect');
-const mitigateBtn = document.getElementById('mitigateBtn');
-const resultsDiv = document.getElementById('results');
+const positiveLabelContainer = document.getElementById('positiveLabelContainer');
+const resultsContent = document.getElementById('resultsContent');
 const downloadPanel = document.getElementById('downloadPanel');
 const downloadLink = document.getElementById('downloadLink');
+
+// Initialize GSAP animations
+gsap.registerPlugin(ScrollTrigger);
+
+// Initialize page animations
+function initAnimations() {
+  // Animate hero section
+  gsap.from('.hero-content', {
+    y: 50,
+    opacity: 0,
+    duration: 1,
+    delay: 0.3,
+    ease: 'power3.out'
+  });
+
+  // Animate upload section
+  gsap.from('.upload-section', {
+    y: 30,
+    opacity: 0,
+    duration: 0.8,
+    delay: 0.6,
+    ease: 'back.out(1.7)'
+  });
+}
+
+// Initialize tooltips
+function initTooltips() {
+  const tooltips = document.querySelectorAll('[data-tooltip]');
+  tooltips.forEach(tooltip => {
+    const tooltipText = tooltip.getAttribute('data-tooltip');
+    const tooltipElement = document.createElement('div');
+    tooltipElement.className = 'tooltip';
+    tooltipElement.textContent = tooltipText;
+    tooltip.appendChild(tooltipElement);
+  });
+}
+
+// File input handling
+function setupFileInput() {
+  if (fileInput) {
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        fileMeta.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+          </svg>
+          <span>${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+        `;
+        
+        // Show config panel
+        gsap.to(configPanel, {
+          opacity: 1,
+          height: 'auto',
+          duration: 0.5,
+          onComplete: () => {
+            configPanel.classList.remove('hidden');
+            loadFileData(file);
+          }
+        });
+      }
+    });
+  }
+}
+
+// Load file data and populate selects
+function loadFileData(file) {
+  // In a real app, you would parse the file and get column names
+  // For now, we'll simulate this with a timeout
+  setTimeout(() => {
+    // Simulate getting columns from the file
+    const columns = ['Gender', 'Age', 'Experience', 'Salary', 'Hired'];
+    
+    // Populate sensitive attribute and target column selects
+    populateSelect(sensitiveSelect, columns);
+    populateSelect(targetSelect, ['', ...columns]);
+    
+    // Show the config panel with animation
+    gsap.to(configPanel, {
+      opacity: 1,
+      y: 0,
+      duration: 0.5
+    });
+  }, 500);
+}
+
+// Populate select element with options
+function populateSelect(selectElement, options) {
+  selectElement.innerHTML = '';
+  options.forEach(option => {
+    const optionElement = document.createElement('option');
+    optionElement.value = option;
+    optionElement.textContent = option || '-- Select --';
+    selectElement.appendChild(optionElement);
+  });
+}
+
+// Toggle positive label input based on target selection
+function setupTargetSelect() {
+  if (targetSelect) {
+    targetSelect.addEventListener('change', (e) => {
+      if (e.target.value) {
+        positiveLabelContainer.style.display = 'block';
+        gsap.from(positiveLabelContainer, {
+          opacity: 0,
+          y: 10,
+          duration: 0.3
+        });
+      } else {
+        gsap.to(positiveLabelContainer, {
+          opacity: 0,
+          y: -10,
+          duration: 0.2,
+          onComplete: () => {
+            positiveLabelContainer.style.display = 'none';
+          }
+        });
+      }
+    });
+  }
+}
+
+// Smooth scroll for anchor links
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+  anchor.addEventListener('click', function (e) {
+    e.preventDefault();
+    const target = document.querySelector(this.getAttribute('href'));
+    if (target) {
+      target.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+  });
+});
+
+// Add hover effect to glass cards
+document.querySelectorAll('.glass').forEach(card => {
+  card.addEventListener('mousemove', (e) => {
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    card.style.setProperty('--mouse-x', `${x}px`);
+    card.style.setProperty('--mouse-y', `${y}px`);
+  });
+});
+
+// Additional DOM Elements
+const mitigateBtn = document.getElementById('mitigateBtn');
+const resultsDiv = document.getElementById('results');
 const adjustOptions = document.getElementById('adjustOptions');
 const modifyOriginal = document.getElementById('modifyOriginal');
 const thresholdContainer = document.getElementById('thresholdContainer');
 const thresholdInput = document.getElementById('threshold');
 
-// Debug log
-console.log('DOM elements initialized');
-
 // Toggle adjust options based on method selection
-methodSelect.addEventListener('change', () => {
-  if (methodSelect.value === 'adjust') {
-    adjustOptions.classList.remove('hidden');
-  } else {
-    adjustOptions.classList.add('hidden');
+function setupMethodSelect() {
+  if (methodSelect) {
+    methodSelect.addEventListener('change', () => {
+      if (methodSelect.value === 'adjust') {
+        adjustOptions.classList.remove('hidden');
+      } else {
+        adjustOptions.classList.add('hidden');
+      }
+    });
   }
+}
+
+// Initialize everything when the DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+  initAnimations();
+  initTooltips();
+  setupFileInput();
+  setupTargetSelect();
+  setupMethodSelect();
+  
+  // Debug log
+  console.log('DOM elements initialized');
 });
 
 // Toggle threshold input based on modifyOriginal checkbox
