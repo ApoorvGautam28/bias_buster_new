@@ -5,7 +5,7 @@ from werkzeug.utils import secure_filename
 import pandas as pd
 
 from bias.metrics import compute_bias_report
-from bias.mitigate import reweigh_dataset, resample_dataset
+from bias.mitigate import reweigh_dataset, resample_dataset, adjust_values
 
 APP_ROOT = os.path.dirname(os.path.abspath(__file__))
 # Use writable /tmp on Vercel; otherwise default to project directory
@@ -130,8 +130,28 @@ def mitigate():
         out_path = os.path.join(OUTPUT_DIR, out_name)
         mitigated.to_csv(out_path, index=False)
         return jsonify({'download': f"/download/{out_name}", 'method': 'resample'}), 200
+    elif method == 'adjust':
+        if not target_col:
+            return jsonify({'error': 'Target column is required for adjust method'}), 400
+        adjustment_method = data.get('adjustment_method', 'multiply')
+        try:
+            mitigated = adjust_values(
+                df, 
+                sensitive_col=sens_col, 
+                target_col=target_col,
+                method=adjustment_method
+            )
+            out_name = f"{file_id}_adjusted_{adjustment_method}.csv"
+            out_path = os.path.join(OUTPUT_DIR, out_name)
+            mitigated.to_csv(out_path, index=False)
+            return jsonify({
+                'download': f"/download/{out_name}", 
+                'method': f'adjust_{adjustment_method}'
+            }), 200
+        except Exception as e:
+            return jsonify({'error': f'Adjustment failed: {str(e)}'}), 400
     else:
-        return jsonify({'error': 'Unknown method. Use reweigh or resample.'}), 400
+        return jsonify({'error': 'Unknown method. Use reweigh, resample, or adjust.'}), 400
 
 
 @app.route('/download/<path:filename>', methods=['GET'])

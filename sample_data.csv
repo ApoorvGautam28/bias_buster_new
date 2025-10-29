@@ -1,0 +1,21 @@
+Candidate_ID,Name,Gender,Age,Education,University,Years_of_Experience,Technical_Score,Interview_Score,Past_Experience_Domain,Hired
+1,Arjun Mehta,Male,27,M.Tech,IIT Delhi,3,88,90,Software Development,1
+2,Neha Sharma,Female,30,B.Tech,NIT Trichy,4,85,87,Data Analytics,1
+3,Ravi Kumar,Male,24,B.Tech,IIT Bombay,2,91,89,Machine Learning,1
+4,Ananya Patel,Female,35,M.Sc,Private University,6,82,84,Teaching,0
+5,Sandeep Roy,Male,32,M.Tech,NIT Warangal,5,86,83,AI Research,1
+6,Priyanka Das,Female,28,B.Tech,State University,3,78,80,Software Testing,0
+7,Amit Verma,Male,40,PhD,Private University,12,90,85,Academia,0
+8,Simran Kaur,Female,26,B.Tech,IIT Kanpur,2,87,88,Data Science,1
+9,Manish Gupta,Male,29,M.Tech,IIIT Hyderabad,4,89,84,Software Engineering,1
+10,Sneha Nair,Female,33,M.Sc,Private University,7,83,81,Data Analytics,0
+11,Rohit Singh,Male,23,B.Tech,NIT Surathkal,1,84,85,Machine Learning,1
+12,Kavita Reddy,Female,38,PhD,Private University,10,88,86,Academia,0
+13,Vikram Joshi,Male,31,M.Tech,IIT Madras,6,90,91,AI Research,1
+14,Anjali Yadav,Female,27,B.Tech,Private University,3,79,82,Data Science,0
+15,Rohan Das,Male,25,B.Tech,IIT Kharagpur,2,92,90,Machine Learning,1
+16,Deepa Menon,Female,29,M.Sc,State University,5,81,83,Software Development,0
+17,Karan Bhatia,Male,28,B.Tech,NIT Calicut,4,85,88,Data Science,1
+18,Pooja Jain,Female,34,M.Tech,Private University,6,84,82,Software Testing,0
+19,Nikhil Chauhan,Male,26,B.Tech,IIT Roorkee,3,93,92,AI Research,1
+20,Asha Iyer,Female,31,B.Tech,State University,5,86,84,Data Science,0

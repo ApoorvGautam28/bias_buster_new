@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Optional, Dict, Union
 import pandas as pd
 import numpy as np
 
@@ -107,3 +107,102 @@ def resample_dataset(
             else:
                 outs.append(grp)
         return pd.concat(outs, axis=0, ignore_index=True)
+
+
+def adjust_values(
+    df: pd.DataFrame,
+    sensitive_col: str,
+    target_col: str,
+    adjustment_factors: Optional[Dict[Any, float]] = None,
+    method: str = 'multiply',
+    inplace: bool = False,
+    modify_original: bool = False,
+    threshold: float = 0.5
+) -> pd.DataFrame:
+    """
+    Adjust target values based on sensitive attribute to reduce bias.
+    
+    Args:
+        df: Input DataFrame
+        sensitive_col: Name of the sensitive attribute column
+        target_col: Name of the target column to adjust
+        adjustment_factors: Dictionary mapping sensitive attribute values to adjustment factors.
+                          If None, will automatically calculate to equalize group means.
+        method: 'multiply' or 'add' - how to apply the adjustment factors
+        inplace: If True, modifies the input DataFrame directly
+        
+    Returns:
+        DataFrame with adjusted target values
+    """
+    if not inplace:
+        df = df.copy()
+    
+    if target_col not in df.columns:
+        raise ValueError(f"Target column '{target_col}' not found in DataFrame")
+    
+    if sensitive_col not in df.columns:
+        raise ValueError(f"Sensitive column '{sensitive_col}' not found in DataFrame")
+    
+    # Convert target to numeric if it's not already
+    if not np.issubdtype(df[target_col].dtype, np.number):
+        if not inplace:
+            df = df.copy()
+
+    # For binary classification with original modification, we'll use a different approach
+    if modify_original and target_col == 'Hired':
+        # Calculate the target number of hires per group for equal representation
+        total_hires = df[target_col].sum()
+        group_counts = df[sensitive_col].value_counts()
+        target_hires = {}
+        
+        # Calculate target hires to balance the groups
+        for group, count in group_counts.items():
+            # Aim for proportional representation based on group size
+            target_hires[group] = int(round((count / len(df)) * total_hires))
+        
+        # Sort candidates within each group by their scores (Technical_Score + Interview_Score)
+        df['total_score'] = df['Technical_Score'] + df['Interview_Score']
+        df_sorted = df.sort_values(by='total_score', ascending=False)
+        
+        # Reset the Hired column
+        df[target_col] = 0
+        
+        # Select top candidates from each group to meet the target
+        for group, target in target_hires.items():
+            group_indices = df_sorted[df_sorted[sensitive_col] == group].index[:target]
+            df.loc[group_indices, target_col] = 1
+        
+        # Clean up
+        df = df.drop(columns=['total_score'])
+        
+        print(f"\nOriginal 'Hired' values have been updated to reduce bias.")
+        print("Adjusted hiring counts by group:")
+        print(df.groupby(sensitive_col)[target_col].value_counts().unstack())
+        
+        return df
+    
+    # Original adjustment logic for non-binary or non-Hired targets
+    if adjustment_factors is None:
+        group_means = df.groupby(sensitive_col)[target_col].mean()
+        overall_mean = df[target_col].mean()
+        adjustment_factors = (overall_mean / group_means).to_dict()
+
+    # Apply adjustments
+    adjusted = []
+    for _, row in df.iterrows():
+        val = row[target_col]
+        factor = adjustment_factors.get(row[sensitive_col], 1.0)
+        
+        if method == 'multiply':
+            adjusted_val = val * factor
+        else:  # 'add'
+            adjusted_val = val + factor
+        adjusted.append(adjusted_val)
+
+    if inplace:
+        df[target_col] = adjusted
+    else:
+        df = df.copy()
+        df[target_col + '_adjusted'] = adjusted
+    
+    return df
