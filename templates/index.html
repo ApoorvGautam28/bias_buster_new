@@ -64,7 +64,18 @@
               <select id="methodSelect" class="bg-white/5 border border-white/10 rounded-lg p-2">
                 <option value="reweigh">Reweigh</option>
                 <option value="resample">Resample</option>
+                <option value="adjust">Adjust Values</option>
               </select>
+            </div>
+            <div id="adjustOptions" class="hidden space-x-2">
+              <label class="text-sm text-slate-300">
+                <input type="checkbox" id="modifyOriginal" class="mr-1"> Modify Original
+              </label>
+              <div id="thresholdContainer" class="hidden inline-block">
+                <label class="text-sm text-slate-300">
+                  Threshold: <input type="number" id="threshold" value="0.5" step="0.1" min="0" max="1" class="w-16 bg-white/5 border border-white/10 rounded p-1">
+                </label>
+              </div>
             </div>
             <button id="mitigateBtn" class="px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 font-semibold">Mitigate & Export</button>
           </div>

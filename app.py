@@ -37,26 +37,76 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload():
+    app.logger.info('Upload endpoint hit')
+    app.logger.info(f'Request files: {request.files}')
+    
+    # Ensure upload directory exists
+    try:
+        app.logger.info(f'Ensuring upload directory exists: {UPLOAD_DIR}')
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        # Test if directory is writable
+        test_file = os.path.join(UPLOAD_DIR, '.test')
+        app.logger.info('Testing directory write permissions...')
+        with open(test_file, 'w') as f:
+            f.write('test')
+        os.remove(test_file)
+        app.logger.info('Directory write test successful')
+    except Exception as e:
+        error_msg = f'Failed to create/write to upload directory {UPLOAD_DIR}: {str(e)}'
+        app.logger.error(error_msg)
+        return jsonify({'error': f'Server error: Could not create upload directory. {str(e)}'}), 500
+
     if 'file' not in request.files:
         return jsonify({'error': 'No file part'}), 400
+        
     f = request.files['file']
     if f.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
+        return jsonify({'error': 'No file selected'}), 400
+        
     if not allowed_file(f.filename):
         return jsonify({'error': 'Only .csv files are supported'}), 400
 
-    filename = secure_filename(f.filename)
-    file_id = str(uuid.uuid4())
-    save_name = f"{file_id}_{filename}"
-    save_path = os.path.join(UPLOAD_DIR, save_name)
-    f.save(save_path)
-
-    # Try reading once to validate CSV
     try:
-        df = pd.read_csv(save_path)
+        # Secure the filename and create a unique path
+        filename = secure_filename(f.filename)
+        if not filename:  # In case secure_filename returns empty
+            return jsonify({'error': 'Invalid file name'}), 400
+            
+        file_id = str(uuid.uuid4())
+        save_name = f"{file_id}_{filename}"
+        save_path = os.path.join(UPLOAD_DIR, save_name)
+        
+        # Save the file
+        f.save(save_path)
+        
+        # Verify the file was saved and is not empty
+        if not os.path.exists(save_path) or os.path.getsize(save_path) == 0:
+            if os.path.exists(save_path):
+                os.remove(save_path)
+            return jsonify({'error': 'Uploaded file is empty'}), 400
+            
+        # Try reading the CSV to validate it
+        try:
+            df = pd.read_csv(save_path)
+            if df.empty:
+                raise ValueError('The CSV file is empty')
+                
+        except Exception as e:
+            if os.path.exists(save_path):
+                os.remove(save_path)
+            return jsonify({
+                'error': 'Invalid CSV file',
+                'details': str(e)
+            }), 400
+            
     except Exception as e:
-        os.remove(save_path)
-        return jsonify({'error': f'Failed to read CSV: {e}'}), 400
+        app.logger.error(f'Error during file upload: {str(e)}')
+        if 'save_path' in locals() and os.path.exists(save_path):
+            os.remove(save_path)
+        return jsonify({
+            'error': 'Failed to process uploaded file',
+            'details': str(e)
+        }), 500
 
     # Save metadata
     REGISTRY[file_id] = {
@@ -134,22 +184,62 @@ def mitigate():
         if not target_col:
             return jsonify({'error': 'Target column is required for adjust method'}), 400
         adjustment_method = data.get('adjustment_method', 'multiply')
+        modify_original = data.get('modify_original', False)
+        threshold = float(data.get('threshold', 0.5)) if modify_original else 0.5
+        
         try:
-            mitigated = adjust_values(
-                df, 
+            # Create a copy of the dataframe to avoid modifying the original
+            df_mitigated = df.copy()
+            
+            # Apply bias correction
+            df_mitigated = adjust_values(
+                df_mitigated, 
                 sensitive_col=sens_col, 
                 target_col=target_col,
-                method=adjustment_method
+                method=adjustment_method,
+                modify_original=modify_original,
+                threshold=threshold
             )
-            out_name = f"{file_id}_adjusted_{adjustment_method}.csv"
+            
+            # If we modified the original column, ensure the target column has the corrected values
+            if modify_original and target_col in df_mitigated.columns:
+                # Convert to binary if it's a probability
+                if df_mitigated[target_col].dtype == float:
+                    df_mitigated[target_col] = (df_mitigated[target_col] > threshold).astype(int)
+                
+                # Add a column indicating the original values for reference
+                df_mitigated[f'original_{target_col}'] = df[target_col]
+                
+                # Calculate and log the changes
+                original_counts = df[target_col].value_counts()
+                new_counts = df_mitigated[target_col].value_counts()
+                print(f"Original counts: {original_counts.to_dict()}")
+                print(f"Adjusted counts: {new_counts.to_dict()}")
+            
+            # Save the mitigated dataset
+            out_name = f"{file_id}_adjusted_{adjustment_method}_{'modified' if modify_original else 'weighted'}.csv"
             out_path = os.path.join(OUTPUT_DIR, out_name)
-            mitigated.to_csv(out_path, index=False)
+            df_mitigated.to_csv(out_path, index=False)
+            
+            # Calculate and include some statistics in the response
+            stats = {
+                'original_size': len(df),
+                'mitigated_size': len(df_mitigated),
+                'original_positive': int(df[target_col].sum()),
+                'mitigated_positive': int(df_mitigated[target_col].sum())
+            }
+            
             return jsonify({
                 'download': f"/download/{out_name}", 
-                'method': f'adjust_{adjustment_method}'
+                'method': f'adjust_{adjustment_method}',
+                'stats': stats
             }), 200
+            
         except Exception as e:
-            return jsonify({'error': f'Adjustment failed: {str(e)}'}), 400
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"Error in adjust method: {error_details}")
+            return jsonify({'error': f'Adjustment failed: {str(e)}', 'details': error_details}), 400
     else:
         return jsonify({'error': 'Unknown method. Use reweigh, resample, or adjust.'}), 400
 

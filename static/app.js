@@ -13,6 +13,31 @@ const mitigateBtn = document.getElementById('mitigateBtn');
 const resultsDiv = document.getElementById('results');
 const downloadPanel = document.getElementById('downloadPanel');
 const downloadLink = document.getElementById('downloadLink');
+const adjustOptions = document.getElementById('adjustOptions');
+const modifyOriginal = document.getElementById('modifyOriginal');
+const thresholdContainer = document.getElementById('thresholdContainer');
+const thresholdInput = document.getElementById('threshold');
+
+// Debug log
+console.log('DOM elements initialized');
+
+// Toggle adjust options based on method selection
+methodSelect.addEventListener('change', () => {
+  if (methodSelect.value === 'adjust') {
+    adjustOptions.classList.remove('hidden');
+  } else {
+    adjustOptions.classList.add('hidden');
+  }
+});
+
+// Toggle threshold input based on modifyOriginal checkbox
+modifyOriginal.addEventListener('change', () => {
+  if (modifyOriginal.checked) {
+    thresholdContainer.classList.remove('hidden');
+  } else {
+    thresholdContainer.classList.add('hidden');
+  }
+});
 
 function setResults(html) {
   resultsDiv.innerHTML = html;
@@ -22,27 +47,70 @@ function optionHtml(v) { return `<option value="${v}">${v}</option>`; }
 
 uploadForm.addEventListener('submit', async (e) => {
   e.preventDefault();
+  console.log('Form submitted');
+  
   const file = fileInput.files[0];
-  if (!file) { alert('Select a CSV file'); return; }
+  if (!file) { 
+    console.log('No file selected');
+    alert('Please select a CSV file first'); 
+    return; 
+  }
+  
+  console.log('Selected file:', file.name, 'Size:', file.size, 'bytes');
+  
   const form = new FormData();
   form.append('file', file);
-  setResults('<p class="text-sm">Uploading...</p>');
+  
+  console.log('FormData created, sending request...');
+  setResults('<p class="text-sm">Uploading file...</p>');
+  
   try {
-    const resp = await fetch('/upload', { method: 'POST', body: form });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error || 'Upload failed');
+    const response = await fetch('/upload', { 
+      method: 'POST', 
+      body: form,
+      // Don't set Content-Type header - let the browser set it with the correct boundary
+    });
+    
+    console.log('Response status:', response.status);
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('Upload failed:', errorData);
+      throw new Error(errorData.error || `Upload failed with status ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('Upload successful:', data);
+    
     state.file_id = data.file_id;
     fileMeta.textContent = `${data.filename} — ${data.n_rows} rows, ${data.n_cols} cols`;
+    
+    // Load columns
+    console.log('Fetching columns...');
     const colResp = await fetch(`/columns?file_id=${state.file_id}`);
+    if (!colResp.ok) throw new Error('Failed to load columns');
+    
     const colData = await colResp.json();
     state.columns = colData.columns || [];
+    console.log('Loaded columns:', state.columns);
+    
+    // Update UI
     sensitiveSelect.innerHTML = state.columns.map(optionHtml).join('');
     targetSelect.innerHTML = '<option value="">None</option>' + state.columns.map(optionHtml).join('');
+    
     configPanel.classList.remove('hidden');
-    setResults('<p class="text-sm">File uploaded. Configure columns, then Analyze.</p>');
+    setResults('<p class="text-sm text-green-400">✓ File uploaded successfully</p>');
     downloadPanel.classList.add('hidden');
+    
   } catch (err) {
-    setResults(`<p class='text-red-300 text-sm'>${err.message}</p>`);
+    console.error('Upload error:', err);
+    setResults(`
+      <div class="bg-red-900/50 border border-red-700 rounded-lg p-4">
+        <p class="font-medium text-red-200">Upload failed</p>
+        <p class="text-sm text-red-300 mt-1">${err.message}</p>
+        <p class="text-xs text-red-400 mt-2">Check the console for more details</p>
+      </div>
+    `);
   }
 });
 
@@ -83,20 +151,53 @@ mitigateBtn.addEventListener('click', async () => {
     positive_label = Number(positive_label);
   }
 
+  // Get bias correction options
+  const modify_original = method === 'adjust' ? modifyOriginal.checked : false;
+  const threshold = method === 'adjust' && modify_original ? parseFloat(thresholdInput.value) : 0.5;
+
   setResults('<p class="text-sm">Mitigating...</p>');
   downloadPanel.classList.add('hidden');
+  
   try {
+    const payload = {
+      file_id: state.file_id,
+      sensitive,
+      target,
+      method,
+      positive_label,
+      modify_original,
+      threshold
+    };
+
+    if (method === 'adjust') {
+      payload.adjustment_method = 'multiply';
+    }
+
     const resp = await fetch('/mitigate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ file_id: state.file_id, sensitive, target, method, positive_label })
+      body: JSON.stringify(payload)
     });
+    
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error || 'Mitigation failed');
-    setResults(`<p class='text-sm'>Mitigation complete using <b>${data.method}</b>.</p>`);
+    
+    // Show results with statistics if available
+    let resultsHtml = `<p class='text-sm'>Mitigation complete using <b>${data.method}</b>.</p>`;
+    if (data.stats) {
+      resultsHtml += `
+        <div class="mt-2 p-3 bg-white/5 rounded-lg text-sm">
+          <p>Original dataset: ${data.stats.original_size} rows, ${data.stats.original_positive} positive</p>
+          <p>Mitigated dataset: ${data.stats.mitigated_size} rows, ${data.stats.mitigated_positive} positive</p>
+        </div>
+      `;
+    }
+    setResults(resultsHtml);
+    
     downloadLink.href = data.download;
     downloadPanel.classList.remove('hidden');
   } catch (err) {
+    console.error('Mitigation error:', err);
     setResults(`<p class='text-red-300 text-sm'>${err.message}</p>`);
   }
 });
