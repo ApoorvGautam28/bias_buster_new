@@ -5,10 +5,13 @@ services:
     python:
       version: 3.10.0
     buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements.txt
+      python -m pip install --upgrade pip
+      python -m pip install --upgrade setuptools wheel
+      python -m pip install -r requirements.txt
     startCommand: gunicorn app:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.0
+      - key: PIP_DEFAULT_TIMEOUT
+        value: "100"
     plan: free
